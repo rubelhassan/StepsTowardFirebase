@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">StepsTowardFirebase</string>
+    <string name="logout">Logout</string>
+    <string name="email">email</string>
+    <string name="password">password</string>
+    <string name="login">Login</string>
+    <string name="signup">Signup</string>
 </resources>
