@@ -63,6 +63,9 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
             // TODO validate user inputs before trying to login
 
             tryLoginUser(email, password);
+        }else if(v.getId() == R.id.btn_signup_act_login){
+            Intent signUpIntent = new Intent(LoginActivity.this, SignupActivity.class);
+            startActivity(signUpIntent);
         }
     }
 
@@ -74,9 +77,11 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         mEditTextEmail = (EditText) findViewById(R.id.edit_text_email_act_login);
         mEditTextPassword = (EditText) findViewById(R.id.edit_text_password_act_login);
         mBtnLogin = (Button) findViewById(R.id.btn_login_act_login);
+        mBtnSignup = (Button) findViewById(R.id.btn_signup_act_login);
 
         // attach listener
         mBtnLogin.setOnClickListener(this);
+        mBtnSignup.setOnClickListener(this);
     }
 
 
