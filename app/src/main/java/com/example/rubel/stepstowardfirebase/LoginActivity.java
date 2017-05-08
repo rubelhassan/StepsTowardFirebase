@@ -1,15 +1,23 @@
 package com.example.rubel.stepstowardfirebase;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.facebook.AccessToken;
+import com.facebook.CallbackManager;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
+import com.facebook.login.LoginResult;
+import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.auth.api.Auth;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
@@ -21,19 +29,20 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
 /**
  * Copyright 2017 Rubel Hassan. All Rights Reserved.
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,7 +51,7 @@ import com.google.firebase.auth.GoogleAuthProvider;
  */
 
 public class LoginActivity extends AppCompatActivity implements
-        View.OnClickListener, GoogleApiClient.OnConnectionFailedListener{
+        View.OnClickListener, GoogleApiClient.OnConnectionFailedListener {
 
     private static final int RC_GOOGLE_SIGN_IN = 101;
 
@@ -56,9 +65,14 @@ public class LoginActivity extends AppCompatActivity implements
     private Button mBtnLogin;
     private Button mBtnSignup;
     private SignInButton mBtnGoogleSignIn;
+    private LoginButton mBtnFacebookSignIn;
+    private ProgressDialog mProgressDialog;
 
     // Google API client
     private GoogleApiClient mGoogleApiClient;
+
+    // Facebook API client
+    private CallbackManager mFacebookCallbackManager;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -68,6 +82,8 @@ public class LoginActivity extends AppCompatActivity implements
         initUiComponents();
 
         configureGoogleSignIn();
+
+        configureFacebookSignIn();
 
         mAuth = FirebaseAuth.getInstance();
     }
@@ -92,17 +108,17 @@ public class LoginActivity extends AppCompatActivity implements
 
     @Override
     public void onClick(View v) {
-        if(v.getId() == R.id.btn_login_act_login){
+        if (v.getId() == R.id.btn_login_act_login) {
             String email = mEditTextEmail.getText().toString().trim();
             String password = mEditTextPassword.getText().toString().trim();
 
             // TODO validate user inputs before trying to login
 
             tryLoginUser(email, password);
-        }else if(v.getId() == R.id.btn_signup_act_login){
+        } else if (v.getId() == R.id.btn_signup_act_login) {
             Intent signUpIntent = new Intent(LoginActivity.this, SignupActivity.class);
             startActivity(signUpIntent);
-        }else if(v.getId() == R.id.btn_google_signin){
+        } else if (v.getId() == R.id.btn_google_signin) {
             tryGoogleSignIn();
         }
     }
@@ -117,6 +133,7 @@ public class LoginActivity extends AppCompatActivity implements
         mBtnLogin = (Button) findViewById(R.id.btn_login_act_login);
         mBtnSignup = (Button) findViewById(R.id.btn_signup_act_login);
         mBtnGoogleSignIn = (SignInButton) findViewById(R.id.btn_google_signin);
+        mBtnFacebookSignIn = (LoginButton) findViewById(R.id.btn_facebook_signin);
 
         // attach listener
         mBtnLogin.setOnClickListener(this);
@@ -128,7 +145,7 @@ public class LoginActivity extends AppCompatActivity implements
     /*
      * trigger an intent using GoogleApiClient
      */
-    private void tryGoogleSignIn(){
+    private void tryGoogleSignIn() {
         Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
         startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
     }
@@ -142,11 +159,11 @@ public class LoginActivity extends AppCompatActivity implements
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         // login successful
-                        if(task.isSuccessful()){
+                        if (task.isSuccessful()) {
                             navigateToMainActivity();
                         }
                         // login failed
-                        else{
+                        else {
                             Snackbar.make(mEditTextEmail, "Something went wrong",
                                     Snackbar.LENGTH_LONG).show();
                         }
@@ -157,20 +174,47 @@ public class LoginActivity extends AppCompatActivity implements
     /*
      * Login user using google account
      */
-    private void tryLoginWithWithGoogle(GoogleSignInAccount account){
+    private void tryLoginWithWithGoogle(GoogleSignInAccount account) {
         AuthCredential credential = GoogleAuthProvider.getCredential(account.getIdToken(), null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         // sign-in success
-                        if(task.isSuccessful()){
+                        if (task.isSuccessful()) {
                             navigateToMainActivity();
                         }
                         // sign-in failed
-                        else{
+                        else {
                             Snackbar.make(mEditTextEmail, "Google account authentication failed",
                                     Snackbar.LENGTH_LONG).show();
+                        }
+                    }
+                });
+    }
+
+    /*
+     * Login user using facebook account
+     */
+    private void tryFacebookSignIn(AccessToken accessToken) {
+        showProgressDialog("Logging to Facebook");
+        AuthCredential credential = FacebookAuthProvider.getCredential(accessToken.getToken());
+        mAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        hideProgressDialog();
+                        // sign-in success
+                        if (task.isSuccessful()) {
+                            navigateToMainActivity();
+                        }
+                        // sign-in failed
+                        else {
+                            Snackbar.make(mEditTextEmail, "Facebook account authentication failed",
+                                    Snackbar.LENGTH_LONG).show();
+                            Log.w("LOGIN FACEBOOK:", task.getException());
+                            // This may occur if there is an existing account with facebook email
+                            // should use link authentication for that
                         }
                     }
                 });
@@ -195,9 +239,11 @@ public class LoginActivity extends AppCompatActivity implements
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if(requestCode == RC_GOOGLE_SIGN_IN){
+        if (requestCode == RC_GOOGLE_SIGN_IN) {
             GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
             handleSignInResult(result);
+        } else {
+            mFacebookCallbackManager.onActivityResult(requestCode, resultCode, data);
         }
     }
 
@@ -206,16 +252,64 @@ public class LoginActivity extends AppCompatActivity implements
      */
     private void handleSignInResult(GoogleSignInResult result) {
         // sign-in successful
-        if(result.isSuccess()){
+        if (result.isSuccess()) {
             GoogleSignInAccount accGoogle = result.getSignInAccount();
             // now login to firebase using this account
             tryLoginWithWithGoogle(accGoogle);
         }
         // sign-in failed
-        else{
+        else {
             Snackbar.make(mEditTextEmail, "Google sign-in failed",
                     Snackbar.LENGTH_LONG).show();
         }
     }
 
+    /*
+     * initialize callback manager
+     * and register callback for facebook sign in
+     */
+    private void configureFacebookSignIn() {
+        mFacebookCallbackManager = CallbackManager.Factory.create();
+        mBtnFacebookSignIn.setReadPermissions("email", "public_profile");
+        mBtnFacebookSignIn.registerCallback(mFacebookCallbackManager, new FacebookCallback<LoginResult>() {
+            @Override
+            public void onSuccess(LoginResult loginResult) {
+                tryFacebookSignIn(loginResult.getAccessToken());
+            }
+
+            @Override
+            public void onCancel() {
+                Snackbar.make(mEditTextEmail, "Facebook login cancelled",
+                        Snackbar.LENGTH_LONG).show();
+            }
+
+            @Override
+            public void onError(FacebookException error) {
+                Snackbar.make(mEditTextEmail, "Error login to your facebook account",
+                        Snackbar.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void showProgressDialog(String message) {
+        if (mProgressDialog == null) {
+            mProgressDialog = new ProgressDialog(this);
+            mProgressDialog.setMessage(message);
+            mProgressDialog.setIndeterminate(true);
+        }
+
+        mProgressDialog.show();
+    }
+
+    private void hideProgressDialog() {
+        if (mProgressDialog != null && mProgressDialog.isShowing())
+            mProgressDialog.hide();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (mProgressDialog != null)
+            mProgressDialog.dismiss();
+    }
 }

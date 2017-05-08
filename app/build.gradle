@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 25
-    buildToolsVersion "25.0.2"
+    buildToolsVersion "25.0.3"
     defaultConfig {
         applicationId "com.example.rubel.stepstowardfirebase"
         minSdkVersion 21
@@ -17,6 +17,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+// for facebook login
+repositories {
+    mavenCentral()
 }
 
 dependencies {
@@ -35,6 +40,9 @@ dependencies {
 
     // Google play services
     compile 'com.google.android.gms:play-services-auth:10.2.4'
+
+    // Facebook Login
+    compile 'com.facebook.android:facebook-android-sdk:[4,5)'
 
     testCompile 'junit:junit:4.12'
 }

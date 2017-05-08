@@ -6,4 +6,5 @@
     <string name="login">Login</string>
     <string name="signup">Signup</string>
     <string name="retype_password">retype password</string>
+    <string name="facebook_app_id">637319016470836</string>
 </resources>
