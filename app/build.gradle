@@ -44,6 +44,9 @@ dependencies {
     // Facebook Login
     compile 'com.facebook.android:facebook-android-sdk:[4,5)'
 
+    // Facebook Account Kit
+    compile 'com.facebook.android:account-kit-sdk:4.+'
+
     testCompile 'junit:junit:4.12'
 }
 

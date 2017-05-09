@@ -7,4 +7,6 @@
     <string name="signup">Signup</string>
     <string name="retype_password">retype password</string>
     <string name="facebook_app_id">637319016470836</string>
+    <string name="ACCOUNT_KIT_CLIENT_TOKEN">e56212f74a9f5c823087390dbdc21ccf</string>
+    <string name="ak_login_shceme">ak637319016470836</string>
 </resources>

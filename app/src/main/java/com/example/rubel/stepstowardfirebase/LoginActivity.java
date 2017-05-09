@@ -2,15 +2,11 @@ package com.example.rubel.stepstowardfirebase;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.Signature;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -20,6 +16,15 @@ import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
+import com.facebook.accountkit.Account;
+import com.facebook.accountkit.AccountKit;
+import com.facebook.accountkit.AccountKitCallback;
+import com.facebook.accountkit.AccountKitError;
+import com.facebook.accountkit.AccountKitLoginResult;
+import com.facebook.accountkit.ui.AccountKitActivity;
+import com.facebook.accountkit.ui.AccountKitConfiguration;
+import com.facebook.accountkit.ui.LoginType;
+import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.auth.api.Auth;
@@ -35,11 +40,9 @@ import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthInvalidUserException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
-
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /**
  * Copyright 2017 Rubel Hassan. All Rights Reserved.
@@ -61,6 +64,7 @@ public class LoginActivity extends AppCompatActivity implements
         View.OnClickListener, GoogleApiClient.OnConnectionFailedListener {
 
     private static final int RC_GOOGLE_SIGN_IN = 101;
+    private static final int RC_PASSWORD_LESS_SIGN_IN = 201;
 
     // Firebase auth clients
     private FirebaseAuth mAuth;
@@ -220,6 +224,7 @@ public class LoginActivity extends AppCompatActivity implements
                             Snackbar.make(mEditTextEmail, "Facebook account authentication failed",
                                     Snackbar.LENGTH_LONG).show();
                             Log.w("LOGIN FACEBOOK:", task.getException());
+                            LoginManager.getInstance().logOut();
                             // This may occur if there is an existing account with facebook email
                             // should use link authentication for that
                         }
@@ -249,7 +254,10 @@ public class LoginActivity extends AppCompatActivity implements
         if (requestCode == RC_GOOGLE_SIGN_IN) {
             GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
             handleSignInResult(result);
-        } else {
+        } else if(requestCode == RC_PASSWORD_LESS_SIGN_IN){
+            AccountKitLoginResult loginResult = data.getParcelableExtra(AccountKitLoginResult.RESULT_KEY);
+            handlePasswordLessPhoneLogin(loginResult);
+        }else {
             mFacebookCallbackManager.onActivityResult(requestCode, resultCode, data);
         }
     }
@@ -318,5 +326,131 @@ public class LoginActivity extends AppCompatActivity implements
         super.onStop();
         if (mProgressDialog != null)
             mProgressDialog.dismiss();
+    }
+
+    public void onPhoneLoginPressed(View view){
+        // check if phone token is not valid then verify phone
+        if(!verifyAccessToken())
+            loginUsingPhone(LoginType.PHONE);
+        // if valid then login directly
+        else
+            loginFirebaseWithPhoneNumber();
+    }
+
+    /*
+     * login with phone through account toolkit
+     */
+    private void loginUsingPhone(LoginType loginType){
+        // create intent for account kit activity
+        Intent intent = new Intent(this, AccountKitActivity.class);
+
+        // configure login type and response type
+        AccountKitConfiguration.AccountKitConfigurationBuilder configurationBuilder =
+                new AccountKitConfiguration.AccountKitConfigurationBuilder(
+                        loginType,
+                        AccountKitActivity.ResponseType.TOKEN
+                );
+        AccountKitConfiguration configuration = configurationBuilder.build();
+
+        // launch account kit activity
+        intent.putExtra(AccountKitActivity.ACCOUNT_KIT_ACTIVITY_CONFIGURATION, configuration);
+        startActivityForResult(intent, RC_PASSWORD_LESS_SIGN_IN);
+    }
+
+    private boolean verifyAccessToken(){
+        com.facebook.accountkit.AccessToken accessToken = AccountKit.getCurrentAccessToken();
+        if(accessToken != null)
+            return true;
+        return false;
+    }
+
+    private void handlePasswordLessPhoneLogin(final AccountKitLoginResult loginResult){
+
+        if(loginResult.wasCancelled()){
+            Snackbar.make(mEditTextEmail, "Phone number login cancelled",
+                    Snackbar.LENGTH_LONG).show();
+        }else if(loginResult.getError() != null){
+            Snackbar.make(mEditTextEmail, "Phone login failed",
+                    Snackbar.LENGTH_LONG).show();
+        }else {
+            loginFirebaseWithPhoneNumber();
+        }
+    }
+
+    private void loginFirebaseWithPhoneNumber() {
+        AccountKit.getCurrentAccount(new AccountKitCallback<Account>() {
+            @Override
+            public void onSuccess(Account account) {
+                if(account.getPhoneNumber() != null) {
+                    Log.i("PHONE_ACCOUNT", account.getPhoneNumber().toString());
+                    String phone = account.getPhoneNumber().toString();
+                    String email = AppUtils.getEmailFromPhone(phone);
+                    String pass = AppUtils.getPasswordFromEmail(phone);
+                    trySignInUsingPhone(email, pass);
+                }
+                else
+                    Log.i("PHONE_ACCOUNT_EMAIL", account.getEmail());
+            }
+
+            @Override
+            public void onError(AccountKitError accountKitError) {
+                hideProgressDialog();
+                Snackbar.make(mEditTextEmail, "Phone login error",
+                        Snackbar.LENGTH_LONG).show();
+                Log.i("PHONE_ACCOUNT_EMAIL", "ERROR");
+            }
+        });
+    }
+
+    /*
+     * sign in user to firebase using email and password
+     * for phone number
+     */
+    private void trySignInUsingPhone(final String email, final String password){
+        showProgressDialog("Logging with Phone Number");
+        mAuth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        hideProgressDialog();
+                        // login successful
+                        if (task.isSuccessful()) {
+                            navigateToMainActivity();
+                        }
+                        // login failed
+                        else {
+                            // if no user for this phone create one
+                            if(task.getException() instanceof FirebaseAuthInvalidUserException)
+                                trySignUpUsingPhone(email, password);
+                            else
+                                Snackbar.make(mEditTextEmail, "Phone login failed, try again",
+                                        Snackbar.LENGTH_LONG).show();
+                        }
+                    }
+                });
+    }
+
+    /*
+     * sign user user to firebase using email and password
+     * if not created for this phone number
+     */
+    private void trySignUpUsingPhone(String email, String password){
+        showProgressDialog("Signing up with Phone Number");
+        mAuth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        hideProgressDialog();
+                        // user creation success
+                        if(task.isSuccessful()){
+                            navigateToMainActivity();
+                        }
+                        // user not created
+                        else {
+                            Snackbar.make(mBtnSignup, "Something went wrong phone",
+                                    Snackbar.LENGTH_LONG).show();
+                        }
+                    }
+                });
     }
 }

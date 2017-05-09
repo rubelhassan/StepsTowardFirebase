@@ -17,4 +17,23 @@ public class AppUtils {
         Pattern pattern = Pattern.compile(EMAIL_PATTERN);
         return  pattern.matcher(email).matches();
     }
+
+    public static String getEmailFromPhone(String phone){
+        String email;
+
+        if(phone.charAt(0) == '+')
+            email = phone.substring(1);
+        else email = phone;
+
+        email = new StringBuilder()
+            .append(email)
+            .append("@example.com")
+            .toString();
+
+        return email;
+    }
+
+    public static String getPasswordFromEmail(String phone){
+        return phone;
+    }
 }
