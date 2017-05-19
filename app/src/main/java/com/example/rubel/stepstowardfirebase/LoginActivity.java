@@ -92,13 +92,27 @@ public class LoginActivity extends AppCompatActivity implements
 
         initUiComponents();
 
+        mAuth = FirebaseAuth.getInstance();
+
+        checkIfAlreadyLoggedIn();
+
         configureGoogleSignIn();
 
         configureFacebookSignIn();
-
-        mAuth = FirebaseAuth.getInstance();
     }
 
+    /*
+     * see if user already logged in
+     *
+     */
+    private void checkIfAlreadyLoggedIn(){
+        mCurrentAuthUser = mAuth.getCurrentUser();
+
+        if(mCurrentAuthUser == null || mCurrentAuthUser.isAnonymous()){
+            // TODO if wants to login or sign up link current account with that credential
+        }else if(mCurrentAuthUser != null)
+            navigateToMainActivity();
+    }
     /*
      * configure google sign-in options
      * and build google api client
